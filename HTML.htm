@@ -1,0 +1,147 @@
+\<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>鉄道チケット発券</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+            background-color: #f4f4f4;
+        }
+        .ticket {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            width: 350px;
+            border: 2px dashed black;
+            margin-bottom: 20px;
+        }
+        .qr-code {
+            margin-top: 15px;
+        }
+        button {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+        .ticket-info {
+            font-size: 18px;
+            font-weight: bold;
+        }
+        .station-input {
+            margin: 10px 0;
+            padding: 5px;
+            font-size: 16px;
+        }
+        .valid {
+            color: green;
+            font-weight: bold;
+        }
+        .invalid {
+            color: red;
+            font-weight: bold;
+        }
+        @media print {
+            .station-input, button { 
+                display: none; 
+            }
+        }
+    </style>
+    <script>
+        async function generateRandomNumber() {
+            return Math.floor(100000 + Math.random() * 900000);
+        }
+        
+        async function updateTicket() {
+            let fromStation = document.getElementById('fromStation').value;
+            let toStation = document.getElementById('toStation').value;
+            let ticketNumber = await generateRandomNumber();
+            
+            document.getElementById('ticketRoute').innerText = fromStation + ' → ' + toStation;
+            document.getElementById('ticketNumber').innerText = 'チケット番号: ' + ticketNumber;
+            let qrData = encodeURIComponent(fromStation + '-' + toStation + '-Ticket-' + ticketNumber);
+            document.getElementById('qrCode').src = "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=" + qrData;
+        }
+        
+        async function buyTicket() {
+            let fromStation = document.getElementById('fromStation').value;
+            let toStation = document.getElementById('toStation').value;
+            let ticketNumber = document.getElementById('ticketNumber').innerText.split(': ')[1];
+            
+            let response = await fetch('http://localhost:3000/buyTicket', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ from: fromStation, to: toStation, number: ticketNumber })
+            });
+            
+            let result = await response.json();
+            if (result.success) {
+                alert('購入成功');
+            } else {
+                alert('購入失敗');
+            }
+        }
+        
+        async function checkTicketValidity() {
+            let inputCode = document.getElementById('qrCodeInput').value;
+            let response = await fetch('http://localhost:3000/checkTicket', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ ticketData: inputCode })
+            });
+            
+            let result = await response.json();
+            let resultDiv = document.getElementById('qrResult');
+            
+            if (result.valid) {
+                resultDiv.innerHTML = `<p class="valid">このチケットは有効です (${result.from} → ${result.to})</p>`;
+            } else {
+                resultDiv.innerHTML = '<p class="invalid">無効なチケットです</p>';
+            }
+        }
+        
+        window.onload = function() {
+            updateTicket();
+        };
+    </script>
+</head>
+<body>
+    <div class="ticket">
+        <h2>鉄道乗車券</h2>
+        <p class="ticket-info">当日限り有効</p>
+        <p class="ticket-info" id="ticketRoute">大阪 → 京都</p>
+        <p id="ticketNumber">チケット番号: </p>
+        <p>乗車日: 2025年3月13日</p>
+        <div>
+            <input type="text" id="fromStation" class="station-input" placeholder="出発駅" value="大阪">
+            <input type="text" id="toStation" class="station-input" placeholder="到着駅" value="京都">
+            <button onclick="updateTicket()">更新</button>
+            <button onclick="buyTicket()">購入</button>
+        </div>
+        <div class="qr-code">
+            <img id="qrCode" src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=Osaka-Kyoto-Ticket" alt="QRコード">
+        </div>
+        <button onclick="window.print()">チケットを印刷</button>
+    </div>
+    <div class="history" id="ticketHistory">
+        <h3>QRコードで確認</h3>
+        <input type="text" id="qrCodeInput" class="search-input" placeholder="QRコードデータを入力">
+        <button onclick="checkTicketValidity()">確認</button>
+        <div id="qrResult"></div>
+    </div>
+</body>
+</html>
